@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>银川市碳普惠核算平台</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="银川碳核算">
+    <link rel="apple-touch-icon" href="logo512.png">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@500;900&display=swap');
+        body { font-family: 'Noto Sans SC', sans-serif; }
+        .home-bg {
+            background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), 
+                        url('https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover; background-position: center; background-attachment: fixed;
+        }
+        .btn-huge {
+            @apply flex flex-col items-center justify-center transition-all duration-500 transform rounded-[3.5rem] p-10 relative overflow-hidden;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(15px);
+            min-height: 360px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.2);
+        }
+        .btn-huge:hover { @apply -translate-y-8 shadow-2xl bg-white border-opacity-100; }
+        .watermark-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; overflow: hidden; z-index: 5;
+            display: grid; grid-template-columns: repeat(3, 1fr); opacity: 0.08;
+        }
+        .watermark-item { transform: rotate(-30deg); font-size: 12px; font-weight: bold; padding: 50px 20px; white-space: nowrap; color: #000; }
+        @media print {
+            body * { visibility: hidden; }
+            #report-card, #report-card * { visibility: visible; }
+            #report-card { position: absolute; left: 0; top: 0; width: 100% !important; box-shadow: none !important; border: none !important; }
+            .no-print { display: none !important; }
+        }
+        .animate-fadeIn { animation: fadeIn 0.8s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+    <div id="app">
+        <div v-if="!isAuthorized" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900 p-6">
+            <div class="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-md w-full text-center animate-fadeIn">
+                <div class="text-5xl mb-6">🔒</div>
+                <h2 class="text-2xl font-black mb-2">访问限制</h2>
+                <p class="text-slate-400 mb-8 text-sm">请输入授权码以进入核算平台</p>
+                <input v-model="inputAuthCode" @keyup.enter="checkAuth" type="password" placeholder="请输入授权码" class="w-full bg-slate-100 border-2 border-transparent focus:border-slate-900 p-5 rounded-2xl outline-none transition mb-4 text-center tracking-widest font-bold">
+                <button @click="checkAuth" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black hover:bg-slate-800 transition shadow-lg">立即验证</button>
+                <p v-if="authError" class="text-red-500 mt-4 text-sm font-bold animate-pulse">授权码错误，请重新输入</p>
+            </div>
+        </div>
+
+        <div v-if="isAuthorized && view === 'home'" class="home-bg min-h-screen flex flex-col items-center justify-center p-6 animate-fadeIn relative">
+            <div class="text-center mb-20">
+                <h1 class="text-6xl md:text-8xl font-black text-white mb-6 drop-shadow-2xl tracking-tight">银川市碳普惠核算平台</h1>
+                <p class="text-xl md:text-2xl text-white/90 tracking-[0.6em] font-light">规范核算 · 助力双碳</p>
+            </div>
+            <div class="max-w-7xl w-full grid grid-cols-1 md:grid-cols-3 gap-12 px-8 z-10">
+                <button @click="enterModule('air')" class="btn-huge border-b-[12px] border-emerald-500 group">
+                    <span class="text-8xl mb-6 group-hover:scale-110 transition duration-500">♨️</span>
+                    <span class="text-3xl font-black text-gray-800">空气源热泵碳普惠</span>
+                    <div class="mt-8 px-8 py-3 bg-emerald-600 text-white rounded-full text-sm font-black tracking-widest uppercase shadow-lg shadow-emerald-200">点击进入</div>
+                </button>
+                <button @click="enterModule('pv')" class="btn-huge border-b-[12px] border-amber-500 group">
+                    <span class="text-8xl mb-6 group-hover:scale-110 transition duration-500">☀️</span>
+                    <span class="text-3xl font-black text-gray-800">分布式光伏碳普惠</span>
+                    <div class="mt-8 px-8 py-3 bg-amber-600 text-white rounded-full text-sm font-black tracking-widest uppercase shadow-lg shadow-amber-200">点击进入</div>
+                </button>
+                <button @click="enterModule('vineyard')" class="btn-huge border-b-[12px] border-purple-500 group">
+                    <span class="text-8xl mb-6 group-hover:scale-110 transition duration-500">🍷</span>
+                    <span class="text-3xl font-black text-gray-800">葡萄酒庄园碳普惠</span>
+                    <div class="mt-8 px-8 py-3 bg-purple-600 text-white rounded-full text-sm font-black tracking-widest uppercase shadow-lg shadow-purple-200">点击进入</div>
+                </button>
+            </div>
+            <div class="absolute bottom-10 right-12 text-white/50 text-base">宁夏永信项目管理有限公司 SYL</div>
+        </div>
+
+        <main v-if="isAuthorized && view !== 'home'" class="max-w-4xl mx-auto py-12 px-4 animate-fadeIn">
+            <button @click="view = 'home'" class="text-slate-900 font-black mb-8 flex items-center hover:opacity-70 transition text-xl">« 返回主控台</button>
+            <div class="bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border">
+                <div class="flex bg-slate-50 border-b">
+                    <div :class="['flex-1 py-8 text-center font-black transition-all', step === 1 ? activeTabStyle : 'text-gray-300']">01. 基本身份信息</div>
+                    <div :class="['flex-1 py-8 text-center font-black transition-all', step === 2 ? activeTabStyle : 'text-gray-300']">02. 技术参数核算</div>
+                </div>
+                <div class="p-14">
+                    <div v-if="step === 1" class="space-y-8">
+                        <div><label class="text-xs font-black text-gray-400 mb-3 block uppercase tracking-widest">单位/主体全称</label><input v-model="form.unitName" type="text" placeholder="请输入名称" class="w-full bg-slate-50 border-2 p-5 rounded-2xl focus:border-emerald-500 outline-none transition"></div>
+                        <div><label class="text-xs font-black text-gray-400 mb-3 block uppercase tracking-widest">详细地址</label><input v-model="form.address" type="text" placeholder="请输入详细地址" class="w-full bg-slate-50 border-2 p-5 rounded-2xl focus:border-emerald-500 outline-none transition"></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div><label class="text-xs font-black text-gray-400 mb-3 block uppercase tracking-widest">社会信用代码/身份证</label><input v-model="form.unitCode" type="text" placeholder="请输入号码" class="w-full bg-slate-50 border-2 p-5 rounded-2xl outline-none transition"></div>
+                            <div><label class="text-xs font-black text-gray-400 mb-3 block uppercase tracking-widest">联系电话</label><input v-model="form.phone" type="text" placeholder="请输入电话" class="w-full bg-slate-50 border-2 p-5 rounded-2xl outline-none transition"></div>
+                        </div>
+                        <button @click="step = 2" :class="['w-full text-white py-6 rounded-2xl font-black text-xl shadow-xl transition duration-300', btnStyle]">下一步：进入核算</button>
+                    </div>
+
+                    <div v-if="step === 2" class="space-y-10">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <template v-if="view === 'pv'">
+                                <div class="relative"><label class="text-xs font-black text-amber-600 mb-3 block">自用电量 (EG_自用)</label><input v-model.number="form.eg_self" type="number" class="w-full bg-amber-50/30 border-2 border-amber-100 p-5 rounded-2xl pr-20 font-mono text-lg"><span class="absolute right-6 bottom-5 text-amber-600/50 font-bold text-xs uppercase">MWh</span></div>
+                                <div class="relative"><label class="text-xs font-black text-amber-600 mb-3 block">上网电量 (EG_上网)</label><input v-model.number="form.eg_grid" type="number" class="w-full bg-amber-50/30 border-2 border-amber-100 p-5 rounded-2xl pr-20 font-mono text-lg"><span class="absolute right-6 bottom-5 text-amber-600/50 font-bold text-xs uppercase">MWh</span></div>
+                                <div class="relative"><label class="text-xs font-black text-gray-400 mb-3 block uppercase">电量边际 (OM)</label><input disabled value="0.9014" class="w-full bg-slate-50 border-2 p-5 rounded-2xl text-slate-400 font-mono"></div>
+                                <div class="relative"><label class="text-xs font-black text-gray-400 mb-3 block uppercase">容量边际 (BM)</label><input disabled value="0.3597" class="w-full bg-slate-50 border-2 p-5 rounded-2xl text-slate-400 font-mono"></div>
+                            </template>
+                            <template v-if="view === 'air'">
+                                <div class="relative"><label class="text-xs font-black text-emerald-600 mb-3 block uppercase">耗电量 (EC)</label><input v-model.number="form.ec" type="number" class="w-full bg-emerald-50/30 border-2 p-5 rounded-2xl pr-20 font-mono text-lg"><span class="absolute right-6 bottom-5 text-emerald-600/50 font-bold text-xs uppercase">kWh</span></div>
+                                <div class="relative"><label class="text-xs font-black text-gray-400 mb-3 block uppercase">额定制热量 (He)</label><input v-model.number="form.he" type="number" class="w-full bg-slate-50 border-2 p-5 rounded-2xl font-mono text-lg"></div>
+                                <div class="relative"><label class="text-xs font-black text-gray-400 mb-3 block uppercase">额定制热功率 (Pe)</label><input v-model.number="form.pe" type="number" class="w-full bg-slate-50 border-2 p-5 rounded-2xl font-mono text-lg"></div>
+                                <div class="relative"><label class="text-xs font-black text-emerald-600/40 mb-3 block uppercase">排放因子 (EF)</label><input disabled value="0.6423" class="w-full bg-slate-50 border-2 p-5 rounded-2xl text-slate-400 font-mono"><span class="absolute right-6 bottom-5 text-gray-300 font-bold text-[10px]">tCO₂/MWh</span></div>
+                            </template>
+                            <template v-if="view === 'vineyard'">
+                                <div class="relative md:col-span-2">
+                                    <label class="text-xs font-black text-purple-600 mb-3 block uppercase">种植面积 (Area)</label>
+                                    <input v-model.number="form.area" type="number" class="w-full bg-purple-50/30 border-2 border-purple-100 p-5 rounded-2xl pr-20 font-mono text-lg">
+                                    <span class="absolute right-6 bottom-5 text-purple-600/50 font-bold text-xs uppercase">公顷 (hm²)</span>
+                                </div>
+                                <div class="md:col-span-2 p-6 bg-purple-50 rounded-2xl border border-purple-100">
+                                    <h4 class="text-purple-900 font-black text-sm mb-4 flex items-center">
+                                        <span class="mr-2">ℹ️</span> 核算标准说明 (银川市方法学)
+                                    </h4>
+                                    <ul class="text-xs text-purple-700/80 space-y-2 font-medium">
+                                        <li>• 计入项目：地上/地下生物质碳汇 + 土壤有机碳固碳 [cite: 327]</li>
+                                        <li>• 扣减项目：化石燃料燃烧及肥料施用排放 [cite: 434]</li>
+                                        <li>• 默认树龄：按 1-10 年生长期缺省值计算 [cite: 467, 474]</li>
+                                    </ul>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="flex gap-8">
+                            <button @click="step = 1" class="flex-1 bg-slate-100 text-slate-400 py-6 rounded-2xl font-black">上一步</button>
+                            <button @click="doCalculate" :class="['flex-[3] text-white py-6 rounded-2xl font-black text-2xl shadow-2xl transition duration-300', btnStyle]">生成核算报告</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div v-if="isAuthorized && showResult" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-6">
+            <div id="report-card" class="bg-white w-full max-w-xl rounded-[4rem] overflow-hidden shadow-2xl relative">
+                <div class="watermark-container"><div v-for="i in 18" :key="i" class="watermark-item">宁夏永信项目管理有限公司</div></div>
+                <div :class="['p-12 text-white text-center relative z-10', headerStyle]">
+                    <h3 class="text-4xl font-black tracking-tight">{{ moduleName }}减排量报告</h3>
+                </div>
+                <div class="p-14 space-y-8 relative z-10 text-center">
+                    <div>
+                        <p class="text-3xl font-black text-slate-800 leading-snug">{{ form.unitName || '未填写单位' }}</p>
+                        <div class="flex flex-col items-center space-y-1 mt-4 text-xs text-slate-500 font-medium">
+                            <p v-if="form.unitCode">社会信用代码：{{ form.unitCode }}</p>
+                            <p v-if="form.phone">联系电话：{{ form.phone }}</p>
+                            <p v-if="form.address">详细地址：{{ form.address }}</p>
+                        </div>
+                    </div>
+                    
+                    <div v-if="view === 'pv'" class="grid grid-cols-2 gap-4 border-y border-slate-50 py-6">
+                        <div class="text-center"><p class="text-[10px] text-slate-400 uppercase mb-1">自用部分</p><p class="text-xl font-black text-slate-600">{{ results.er_self }} tCO₂</p></div>
+                        <div class="text-center border-l border-slate-50"><p class="text-[10px] text-slate-400 uppercase mb-1">上网部分</p><p class="text-xl font-black text-slate-600">{{ results.er_grid }} tCO₂</p></div>
+                    </div>
+
+                    <div :class="['rounded-[3rem] p-12 border-2 shadow-inner', resultCardStyle]">
+                        <p class="text-xs font-black mb-3 tracking-[0.3em] opacity-60 uppercase">总核定碳减排量 (ERy)</p>
+                        <div class="text-8xl font-black tracking-tighter">{{ results.er }}</div>
+                        <p class="font-black mt-4 text-2xl font-mono uppercase">tCO₂e</p>
+                    </div>
+
+                    <div class="flex gap-4 no-print">
+                        <button @click="showResult = false" class="flex-1 bg-slate-100 text-slate-400 py-6 rounded-[2rem] font-black hover:bg-slate-200">关闭</button>
+                        <button @click="exportPDF" class="flex-[2] bg-slate-900 text-white py-6 rounded-[2rem] font-black shadow-2xl">确认导出 PDF</button>
+                    </div>
+                    <div class="text-[10px] text-slate-300 pt-2 uppercase tracking-widest">核算技术单位：宁夏永信项目管理有限公司</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed } = Vue;
+        createApp({
+            setup() {
+                const isAuthorized = ref(false);
+                const inputAuthCode = ref('');
+                const authError = ref(false);
+                const AUTH_CODE = 'YX2026'; 
+
+                const checkAuth = () => {
+                    if (inputAuthCode.value === AUTH_CODE) {
+                        isAuthorized.value = true;
+                        authError.value = false;
+                    } else {
+                        authError.value = true;
+                        inputAuthCode.value = '';
+                    }
+                };
+
+                const view = ref('home'); 
+                const step = ref(1); 
+                const showResult = ref(false);
+                const form = ref({ unitName: '', address: '', unitCode: '', phone: '', ec: null, he: null, pe: null, eg_self: null, eg_grid: null, area: null });
+                const results = ref({});
+                
+                const enterModule = (m) => { view.value = m; step.value = 1; };
+                const moduleName = computed(() => ({ air: '空气源热泵', pv: '分布式光伏', vineyard: '酿酒葡萄园' }[view.value]));
+                const activeTabStyle = computed(() => ({ air: 'text-emerald-700 border-emerald-600', pv: 'text-amber-700 border-amber-600', vineyard: 'text-purple-700 border-purple-600' }[view.value] + ' border-b-8'));
+                const btnStyle = computed(() => ({ air: 'bg-emerald-600', pv: 'bg-amber-600', vineyard: 'bg-purple-600' }[view.value]));
+                const headerStyle = computed(() => ({ air: 'bg-emerald-900', pv: 'bg-amber-900', vineyard: 'bg-purple-900' }[view.value]));
+                const resultCardStyle = computed(() => ({ air: 'bg-emerald-50 border-emerald-100 text-emerald-900', pv: 'bg-amber-50 border-amber-100 text-amber-900', vineyard: 'bg-purple-50 border-purple-100 text-purple-900' }[view.value]));
+                
+                const doCalculate = () => {
+                    let er = 0, er_self = 0, er_grid = 0;
+                    if (view.value === 'pv') {
+                        const EF_CM = 0.9014 * 0.75 + 0.3597 * 0.25;
+                        er_self = (form.value.eg_self || 0) * EF_CM;
+                        er_grid = (form.value.eg_grid || 0) * EF_CM;
+                        er = er_self + er_grid;
+                    } else if (view.value === 'air') {
+                        let be = ((form.value.ec * (form.value.he / (form.value.pe || 1))) * 0.0036 / 0.65) * 0.02577 * 0.83 * (44 / 12);
+                        let pe = (form.value.ec / 1000) * (1 / 0.9) * 0.6423;
+                        er = be - pe;
+                    } else if (view.value === 'vineyard') {
+                        // 基于《银川市酿酒葡萄园种植碳普惠方法学》优化
+                        // 1. 项目清除量 (ΔC_PROJ): (生物质碳储量变化 + 土壤有机碳变化) * 44/12
+                        // Δc_Biomass = 0.8135 tC/hm2 (表4) 
+                        // d_SOC = 1.3072 tC/hm2 (表6) 
+                        const delta_C_PROJ_per_ha = (0.8135 + 1.3072) * (44/12); // = 7.7759 tCO2e/ha
+                        
+                        // 2. 温室气体排放 (ΔGHG_PROJ): 缺省值 2.1 tCO2e/ha (表7) 
+                        const delta_GHG_per_ha = 2.1;
+                        
+                        // 3. 减排量 (CDR) = ΔC_PROJ - ΔGHG (基准线和泄漏为0) [cite: 448, 456]
+                        er = (form.value.area || 0) * (delta_C_PROJ_per_ha - delta_GHG_per_ha);
+                    }
+                    results.value = { er: er.toFixed(2), er_self: er_self.toFixed(2), er_grid: er_grid.toFixed(2) };
+                    showResult.value = true;
+                };
+
+                return { 
+                    isAuthorized, inputAuthCode, authError, checkAuth,
+                    view, step, form, showResult, results, enterModule, doCalculate, 
+                    exportPDF: () => window.print(), 
+                    moduleName, activeTabStyle, btnStyle, headerStyle, resultCardStyle 
+                };
+            }
+        }).mount('#app');
+    </script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+</script>
+</body>
+</html>
